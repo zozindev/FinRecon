@@ -1,0 +1,3 @@
+transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
+TXN-20260601-0001,APPROVAL,,MERCHANT-001,2026-06-01,12000.00,****-****-****-1234,APPROVED
+TXN-20260601-0002,CANCEL,TXN-20260601-0001,MERCHANT-001,2026-06-01,2000.00,****-****-****-1234,CANCELED
