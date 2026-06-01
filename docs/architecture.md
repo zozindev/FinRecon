@@ -42,7 +42,7 @@ com.portfolio.finrecon
 
 ## Batch
 
-대사와 정산은 Spring Batch `JobLauncher`로 실행한다. API 요청에는 `businessDate`가 전달되고, Batch Job Parameter로 같은 값을 넘긴다. Spring Batch 메타 테이블은 `spring.batch.jdbc.initialize-schema=always`로 초기화하며, 업무 실행 요약은 별도 도메인 테이블인 `batch_executions`에 저장한다.
+대사와 정산은 Spring Batch `JobLauncher`로 실행한다. API 요청에는 `businessDate`가 전달되고, Batch Job Parameter로 같은 값을 넘긴다. Spring Batch 메타 테이블은 Flyway `V4__spring_batch_metadata.sql`로 관리하며, 업무 실행 요약은 별도 도메인 테이블인 `batch_executions`에 저장한다.
 
 ## 인증 방식
 
