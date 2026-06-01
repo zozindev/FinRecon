@@ -1,0 +1,109 @@
+package com.portfolio.finrecon.api;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Sql(statements = {
+        "delete from audit_logs",
+        "delete from batch_executions",
+        "delete from settlements",
+        "delete from reconciliation_results",
+        "delete from ledger_entries",
+        "delete from validation_errors",
+        "delete from external_transactions",
+        "delete from uploaded_files"
+})
+class FinReconWorkflowIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    void uploadsReconcilesAndSettlesDailyTransactions() throws Exception {
+        mockMvc.perform(multipart("/api/v1/transaction-files")
+                .file(csv("file", "transactions.csv", """
+                        transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
+                        TXN-20260601-0001,APPROVAL,,MERCHANT-001,2026-06-01,12000.00,****-****-****-1234,APPROVED
+                        TXN-20260601-0002,CANCEL,TXN-20260601-0001,MERCHANT-001,2026-06-01,2000.00,****-****-****-1234,CANCELED
+                        """)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.validCount").value(2))
+                .andExpect(jsonPath("$.data.errorCount").value(0));
+
+        mockMvc.perform(multipart("/api/v1/ledger-files")
+                .file(csv("file", "ledger-entries.csv", """
+                        ledgerReferenceId,transactionId,merchantId,recordDate,amount,status
+                        LEDGER-0001,TXN-20260601-0001,MERCHANT-001,2026-06-01,12000.00,APPROVED
+                        LEDGER-0002,TXN-20260601-0002,MERCHANT-001,2026-06-01,2000.00,CANCELED
+                        """)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.validCount").value(2))
+                .andExpect(jsonPath("$.data.errorCount").value(0));
+
+        mockMvc.perform(post("/api/v1/reconciliations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"businessDate\":\"2026-06-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].resultType").value("MATCHED"))
+                .andExpect(jsonPath("$.data[1].resultType").value("MATCHED"));
+
+        mockMvc.perform(get("/api/v1/reconciliations/summary")
+                .param("businessDate", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalCount").value(2))
+                .andExpect(jsonPath("$.data.counts.MATCHED").value(2));
+
+        mockMvc.perform(post("/api/v1/settlements/daily")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"businessDate\":\"2026-06-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.approvalAmount").value(12000.00))
+                .andExpect(jsonPath("$.data.cancellationAmount").value(2000.00))
+                .andExpect(jsonPath("$.data.grossAmount").value(10000.00))
+                .andExpect(jsonPath("$.data.feeAmount").value(250.00))
+                .andExpect(jsonPath("$.data.payoutAmount").value(9750.00));
+    }
+
+    @Test
+    void storesInvalidTransactionRowsAsValidationErrors() throws Exception {
+        mockMvc.perform(multipart("/api/v1/transaction-files")
+                .file(csv("file", "invalid-transactions.csv", """
+                        transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
+                        TXN-INVALID-0001,APPROVAL,,MERCHANT-001,2026-06-01,-100.00,****-****-****-1234,APPROVED
+                        """)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.validCount").value(0))
+                .andExpect(jsonPath("$.data.errorCount").value(1));
+
+        mockMvc.perform(get("/api/v1/validation-errors"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].errorCode").value("INVALID_AMOUNT"));
+    }
+
+    private MockMultipartFile csv(String name, String filename, String content) {
+        return new MockMultipartFile(
+                name,
+                filename,
+                "text/csv",
+                content.getBytes(StandardCharsets.UTF_8));
+    }
+}
