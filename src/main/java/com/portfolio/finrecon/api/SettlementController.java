@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.portfolio.finrecon.api.dto.RunDateRequest;
 import com.portfolio.finrecon.api.dto.SettlementResponse;
+import com.portfolio.finrecon.batch.FinReconBatchJobService;
 import com.portfolio.finrecon.common.response.ApiResponse;
 import com.portfolio.finrecon.repository.SettlementRepository;
 import com.portfolio.finrecon.service.SettlementService;
@@ -22,15 +23,20 @@ public class SettlementController {
 
     private final SettlementService settlementService;
     private final SettlementRepository settlementRepository;
+    private final FinReconBatchJobService batchJobService;
 
-    public SettlementController(SettlementService settlementService, SettlementRepository settlementRepository) {
+    public SettlementController(SettlementService settlementService, SettlementRepository settlementRepository,
+            FinReconBatchJobService batchJobService) {
         this.settlementService = settlementService;
         this.settlementRepository = settlementRepository;
+        this.batchJobService = batchJobService;
     }
 
     @PostMapping("/daily")
     public ApiResponse<SettlementResponse> runDaily(@Valid @RequestBody RunDateRequest request) {
-        return ApiResponse.of(SettlementResponse.from(settlementService.runDaily(request.businessDate())));
+        batchJobService.runDailySettlement(request.businessDate());
+        return ApiResponse.of(SettlementResponse.from(settlementRepository.findByBusinessDate(request.businessDate())
+                .orElseThrow()));
     }
 
     @GetMapping

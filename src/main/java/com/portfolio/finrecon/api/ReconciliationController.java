@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.portfolio.finrecon.api.dto.ReconciliationResponse;
 import com.portfolio.finrecon.api.dto.ReconciliationSummaryResponse;
 import com.portfolio.finrecon.api.dto.RunDateRequest;
+import com.portfolio.finrecon.batch.FinReconBatchJobService;
 import com.portfolio.finrecon.common.response.ApiResponse;
 import com.portfolio.finrecon.service.ReconciliationService;
 
@@ -23,14 +24,17 @@ import com.portfolio.finrecon.service.ReconciliationService;
 public class ReconciliationController {
 
     private final ReconciliationService reconciliationService;
+    private final FinReconBatchJobService batchJobService;
 
-    public ReconciliationController(ReconciliationService reconciliationService) {
+    public ReconciliationController(ReconciliationService reconciliationService, FinReconBatchJobService batchJobService) {
         this.reconciliationService = reconciliationService;
+        this.batchJobService = batchJobService;
     }
 
     @PostMapping
     public ApiResponse<List<ReconciliationResponse>> run(@Valid @RequestBody RunDateRequest request) {
-        return ApiResponse.of(reconciliationService.run(request.businessDate())
+        batchJobService.runDailyReconciliation(request.businessDate());
+        return ApiResponse.of(reconciliationService.findByDate(request.businessDate())
                 .stream()
                 .map(ReconciliationResponse::from)
                 .toList());

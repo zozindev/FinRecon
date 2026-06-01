@@ -20,6 +20,7 @@ com.portfolio.finrecon
   api          REST 컨트롤러
   api.dto      요청/응답 DTO
   auth         JWT, 비밀번호 검증, Security 필터, 요청 보안 컨텍스트
+  batch        Spring Batch Job/Step 실행 구성
   common       공통 응답, 예외, 상태 API
   config       MVC 설정
   domain       JPA 엔티티와 enum
@@ -33,9 +34,15 @@ com.portfolio.finrecon
 2. 거래 CSV를 업로드하면 파일 해시로 중복 파일을 차단한다.
 3. CSV 각 행을 검증해 정상 거래와 검증 오류를 분리 저장한다.
 4. 원장 CSV도 동일하게 업로드하고 검증한다.
-5. 업무 일자 기준으로 거래와 원장을 `transactionId`로 비교해 대사 결과를 저장한다.
-6. 대사 결과 중 `MATCHED` 거래만 일일 정산 대상이 된다.
-7. 대사/정산 실행 이력은 `batch_executions`, 주요 행위는 `audit_logs`에 저장한다.
+5. 업무 일자 기준 대사 API가 Spring Batch `dailyReconciliationJob`을 실행한다.
+6. Batch Step이 거래와 원장을 `transactionId`로 비교해 대사 결과를 저장한다.
+7. 정산 API가 Spring Batch `dailySettlementJob`을 실행한다.
+8. Batch Step이 대사 결과 중 `MATCHED` 거래만 일일 정산 대상에 포함한다.
+9. 대사/정산 실행 이력은 `batch_executions`, 주요 행위는 `audit_logs`에 저장한다.
+
+## Batch
+
+대사와 정산은 Spring Batch `JobLauncher`로 실행한다. API 요청에는 `businessDate`가 전달되고, Batch Job Parameter로 같은 값을 넘긴다. Spring Batch 메타 테이블은 `spring.batch.jdbc.initialize-schema=always`로 초기화하며, 업무 실행 요약은 별도 도메인 테이블인 `batch_executions`에 저장한다.
 
 ## 인증 방식
 

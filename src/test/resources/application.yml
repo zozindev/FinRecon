@@ -9,6 +9,11 @@ spring:
       ddl-auto: none
   flyway:
     enabled: true
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
 
 finrecon:
   auth:

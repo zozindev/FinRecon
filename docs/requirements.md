@@ -11,8 +11,8 @@ FinRecon은 외부 결제 대행사에서 받은 거래 CSV와 내부 원장 데
 | 프로젝트 기반 | 완료 | Java 21, Spring Boot 3.5, Gradle, PostgreSQL, Flyway, H2 테스트 |
 | 거래 업로드 | 완료 | CSV 업로드, SHA-256 파일 중복 방지, 행 단위 검증, 정상/오류 분리 저장 |
 | 원장 업로드 | 완료 | CSV 업로드, 원장 참조 ID/거래 ID 중복 검증, 정상/오류 분리 저장 |
-| 대사 | 완료 | 거래 ID 기준 비교, 일자별 재실행 시 기존 결과 교체 |
-| 정산 | 완료 | MATCHED 승인/취소 금액 집계, 2.5% 수수료, 일자별 정산 저장 |
+| 대사 | 완료 | Spring Batch Job 기반 거래 ID 비교, 일자별 재실행 시 기존 결과 교체 |
+| 정산 | 완료 | Spring Batch Job 기반 MATCHED 승인/취소 금액 집계, 2.5% 수수료, 일자별 정산 저장 |
 | 인증/권한 | 완료 | Spring Security 기반 로그인, HMAC-SHA256 JWT, OPERATOR/ADMIN 역할 |
 | 감사 | 완료 | 로그인, 업로드, 대사, 정산 감사 로그 저장 및 ADMIN 조회 |
 | 테스트 | 완료 | MockMvc 통합 테스트로 핵심 흐름 검증 |

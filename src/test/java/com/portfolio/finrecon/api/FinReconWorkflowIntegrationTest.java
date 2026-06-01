@@ -88,6 +88,13 @@ class FinReconWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.grossAmount").value(10000.00))
                 .andExpect(jsonPath("$.data.feeAmount").value(250.00))
                 .andExpect(jsonPath("$.data.payoutAmount").value(9750.00));
+
+        mockMvc.perform(get("/api/v1/batch-executions")
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].executionStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.data[1].executionStatus").value("SUCCESS"));
     }
 
     @Test
