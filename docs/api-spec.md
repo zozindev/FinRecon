@@ -2,6 +2,8 @@
 
 Base URL: `/api/v1`
 
+OpenAPI 3 명세는 애플리케이션 실행 후 `/openapi.yaml`에서 확인할 수 있다.
+
 공통 성공 응답:
 
 ```json

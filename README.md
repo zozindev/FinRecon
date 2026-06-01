@@ -63,6 +63,7 @@ docker compose up -d postgres
 ```http
 GET http://localhost:8080/api/v1/status
 GET http://localhost:8080/actuator/health
+GET http://localhost:8080/openapi.yaml
 ```
 
 테스트:
@@ -85,6 +86,7 @@ GET http://localhost:8080/actuator/health
 - [요구사항](docs/requirements.md)
 - [ERD](docs/erd.md)
 - [API 명세](docs/api-spec.md)
+- [OpenAPI 3 명세](src/main/resources/static/openapi.yaml)
 - [아키텍처](docs/architecture.md)
 - [의사결정 기록](docs/decisions/0001-phase-0-foundation.md)
 - [문제 해결 기록](docs/troubleshooting.md)

@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: FinRecon API
+  version: 1.0.0
+  description: Financial transaction validation, reconciliation, and settlement backend API.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/status:
+    get:
+      security: []
+      summary: Get platform status
+      responses:
+        "200":
+          description: Platform status
+  /api/v1/auth/login:
+    post:
+      security: []
+      summary: Issue JWT access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login result
+  /api/v1/transaction-files:
+    post:
+      summary: Upload external transaction CSV
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Upload processing summary
+  /api/v1/transaction-files/{fileId}:
+    get:
+      summary: Get upload processing summary
+      parameters:
+        - $ref: "#/components/parameters/FileId"
+      responses:
+        "200":
+          description: Upload processing summary
+  /api/v1/transactions:
+    get:
+      summary: List stored external transactions
+      responses:
+        "200":
+          description: Transaction list
+  /api/v1/transactions/{transactionId}:
+    get:
+      summary: Get transaction detail
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transaction detail
+  /api/v1/validation-errors:
+    get:
+      summary: List validation errors
+      parameters:
+        - name: fileId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Validation error list
+  /api/v1/ledger-files:
+    post:
+      summary: Upload ledger CSV
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Upload processing summary
+  /api/v1/ledger-entries:
+    get:
+      summary: List ledger entries
+      responses:
+        "200":
+          description: Ledger entry list
+  /api/v1/reconciliations:
+    post:
+      summary: Run daily reconciliation through Spring Batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunDateRequest"
+      responses:
+        "200":
+          description: Reconciliation results
+    get:
+      summary: List reconciliation results
+      parameters:
+        - $ref: "#/components/parameters/BusinessDate"
+      responses:
+        "200":
+          description: Reconciliation result list
+  /api/v1/reconciliations/summary:
+    get:
+      summary: Get reconciliation summary
+      parameters:
+        - $ref: "#/components/parameters/BusinessDate"
+      responses:
+        "200":
+          description: Reconciliation summary
+  /api/v1/settlements/daily:
+    post:
+      summary: Run daily settlement through Spring Batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunDateRequest"
+      responses:
+        "200":
+          description: Settlement result
+  /api/v1/settlements:
+    get:
+      summary: List settlements
+      responses:
+        "200":
+          description: Settlement list
+  /api/v1/batch-executions:
+    get:
+      summary: List domain batch execution history
+      responses:
+        "200":
+          description: Batch execution list
+  /api/v1/audit-logs:
+    get:
+      summary: List audit logs
+      description: ADMIN role is required.
+      responses:
+        "200":
+          description: Audit log list
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    BusinessDate:
+      name: businessDate
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: operator
+        password:
+          type: string
+          example: operator123!
+    RunDateRequest:
+      type: object
+      required: [businessDate]
+      properties:
+        businessDate:
+          type: string
+          format: date
+          example: "2026-06-01"

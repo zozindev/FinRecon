@@ -42,7 +42,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/status", "/api/v1/auth/login", "/actuator/**").permitAll()
+                        .requestMatchers("/api/v1/status", "/api/v1/auth/login", "/actuator/**", "/openapi.yaml")
+                        .permitAll()
                         .requestMatchers("/api/v1/audit-logs").hasRole("ADMIN")
                         .requestMatchers("/api/v1/**").hasAnyRole("OPERATOR", "ADMIN")
                         .anyRequest().denyAll())

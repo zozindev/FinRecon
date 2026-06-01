@@ -155,6 +155,12 @@ class FinReconWorkflowIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void exposesOpenApiSpecWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/openapi.yaml"))
+                .andExpect(status().isOk());
+    }
+
     private MockMultipartFile csv(String name, String filename, String content) {
         return new MockMultipartFile(
                 name,
