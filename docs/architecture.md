@@ -19,7 +19,7 @@ Controller -> Service -> Repository -> Database
 com.portfolio.finrecon
   api          REST 컨트롤러
   api.dto      요청/응답 DTO
-  auth         JWT, 비밀번호 검증, 인터셉터, 요청 보안 컨텍스트
+  auth         JWT, 비밀번호 검증, Security 필터, 요청 보안 컨텍스트
   common       공통 응답, 예외, 상태 API
   config       MVC 설정
   domain       JPA 엔티티와 enum
@@ -39,7 +39,7 @@ com.portfolio.finrecon
 
 ## 인증 방식
 
-외부 보안 라이브러리를 추가하지 않고 Java 표준 crypto로 HMAC-SHA256 JWT를 생성/검증한다. 비밀번호는 PBKDF2-SHA256 형식으로 저장한다.
+Spring Security의 stateless filter chain에서 HMAC-SHA256 JWT를 검증한다. JWT 서명과 비밀번호 검증은 Java 표준 crypto를 사용하며, 비밀번호는 PBKDF2-SHA256 형식으로 저장한다.
 
 운영 환경에서는 다음 값을 환경 변수로 지정한다.
 
