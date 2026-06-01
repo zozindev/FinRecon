@@ -1,41 +1,53 @@
 # Architecture
 
-## 단일 애플리케이션 선택
+## 개요
 
-초기 목표는 데이터 정합성과 배치 흐름을 설명할 수 있는 완성 가능한 서비스다. 배포 단위와 트랜잭션 경계를 단순하게 유지하기 위해 마이크로서비스, 메시징, 별도 UI를 포함하지 않는다.
+FinRecon은 계층형 Spring Boot 백엔드로 구성한다.
 
-## 패키지 방향
+```text
+Controller -> Service -> Repository -> Database
+```
+
+- Controller: HTTP 요청/응답, Bean Validation, API DTO 변환
+- Service: CSV 파싱, 업무 검증, 대사/정산 계산, 감사 로그 기록
+- Repository: Spring Data JPA 기반 영속성 접근
+- Database: PostgreSQL 운영 스키마, H2 테스트 스키마
+
+## 패키지 구조
 
 ```text
 com.portfolio.finrecon
-  common/              공통 응답, 예외, 설정, 상태 API
-  transaction/         외부 거래와 검증
-  upload/              파일 해시와 CSV 처리
-  ledger/              내부 원장
-  reconciliation/      비교 결과 산출
-  settlement/          일별 정산
-  batch/               실행 이력과 Spring Batch 작업
-  auth/                인증/권한
-  audit/               감사 이벤트
+  api          REST 컨트롤러
+  api.dto      요청/응답 DTO
+  auth         JWT, 비밀번호 검증, 인터셉터, 요청 보안 컨텍스트
+  common       공통 응답, 예외, 상태 API
+  config       MVC 설정
+  domain       JPA 엔티티와 enum
+  repository   Spring Data JPA 리포지토리
+  service      업무 서비스
 ```
 
 ## 데이터 흐름
 
-1. 파일 업로드 서비스가 해시 중복을 확인하고 행을 파싱한다.
-2. 도메인 검증을 통과한 거래만 저장하고 실패 사유는 별도 테이블에 저장한다.
-3. 대사 서비스가 영업일과 거래 ID 기준으로 양쪽 데이터를 비교한다.
-4. 정산 배치는 `MATCHED` 결과만 모아 승인, 취소, 수수료와 지급액을 확정한다.
-5. 쓰기 작업은 감사 서비스로 행위 이력을 남긴다.
+1. 운영자가 로그인해 JWT를 발급받는다.
+2. 거래 CSV를 업로드하면 파일 해시로 중복 파일을 차단한다.
+3. CSV 각 행을 검증해 정상 거래와 검증 오류를 분리 저장한다.
+4. 원장 CSV도 동일하게 업로드하고 검증한다.
+5. 업무 일자 기준으로 거래와 원장을 `transactionId`로 비교해 대사 결과를 저장한다.
+6. 대사 결과 중 `MATCHED` 거래만 일일 정산 대상이 된다.
+7. 대사/정산 실행 이력은 `batch_executions`, 주요 행위는 `audit_logs`에 저장한다.
 
-## 트랜잭션 및 재실행 원칙
+## 인증 방식
 
-- 업로드는 한 파일 처리 단위 트랜잭션과 행 오류 분리 저장의 균형을 Phase 1에서 테스트로 결정한다.
-- 대사 실행은 동일 기준일 결과를 원자적으로 교체하여 오래된 결과와 혼합되지 않게 한다.
-- 정산은 영업일 고유 제약과 배치 실행 이력으로 멱등성을 확보한다.
+외부 보안 라이브러리를 추가하지 않고 Java 표준 crypto로 HMAC-SHA256 JWT를 생성/검증한다. 비밀번호는 PBKDF2-SHA256 형식으로 저장한다.
 
-## 로컬 환경
+운영 환경에서는 다음 값을 환경 변수로 지정한다.
 
-- 애플리케이션: Java 21, Gradle Wrapper
-- 데이터베이스: `compose.yaml`의 PostgreSQL 17
-- 스키마: Flyway `V1__baseline_schema.sql`
-- 자동 테스트: H2의 PostgreSQL compatibility mode를 사용한 빠른 Phase 0 검증; 도메인 구현 시 Testcontainers를 추가한다.
+```text
+FINRECON_JWT_SECRET
+FINRECON_JWT_EXPIRES_IN_SECONDS
+```
+
+## 금액 처리
+
+금액은 Java `BigDecimal`, DB `decimal(19,2)`로 처리한다. 정산 수수료는 `HALF_UP` 반올림으로 소수점 둘째 자리까지 확정한다.

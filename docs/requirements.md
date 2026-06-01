@@ -1,49 +1,58 @@
 # Requirements
 
-## 범위와 진행 상태
+## 목표
 
-FinRecon은 가상의 외부 결제 거래와 내부 원장을 비교하여 정산 결과를 관리하는 단일 Spring Boot 애플리케이션이다. Phase 0은 실행 기반과 계약 문서를 정의한다. 기능 구현 여부는 아래와 같다.
+FinRecon은 외부 결제 대행사에서 받은 거래 CSV와 내부 원장 데이터를 비교해 검증, 대사, 정산 결과를 관리하는 Spring Boot 백엔드 애플리케이션이다. 포트폴리오 관점에서는 단순 CRUD가 아니라 파일 처리, 금액 정합성, 배치성 작업, 인증/권한, 감사 추적을 보여주는 것을 목표로 한다.
 
-| Phase | 범위 | 상태 |
+## 구현 범위
+
+| 영역 | 상태 | 내용 |
 | --- | --- | --- |
-| 0 | 초기 구성, 데이터 모델, API 초안, 로컬 DB, CI 기준선 | 완료 |
-| 1 | 거래 CSV 업로드, 검증, 오류/거래 조회 | 예정 |
-| 2 | 원장 업로드, 대사 실행과 요약 조회 | 예정 |
-| 3 | Spring Batch 기반 일별 정산 | 예정 |
-| 4 | JWT 인증, 권한, 감사 로그 | 예정 |
-| 5 | 운영/성능/포트폴리오 보강 | 예정 |
+| 프로젝트 기반 | 완료 | Java 21, Spring Boot 3.5, Gradle, PostgreSQL, Flyway, H2 테스트 |
+| 거래 업로드 | 완료 | CSV 업로드, SHA-256 파일 중복 방지, 행 단위 검증, 정상/오류 분리 저장 |
+| 원장 업로드 | 완료 | CSV 업로드, 원장 참조 ID/거래 ID 중복 검증, 정상/오류 분리 저장 |
+| 대사 | 완료 | 거래 ID 기준 비교, 일자별 재실행 시 기존 결과 교체 |
+| 정산 | 완료 | MATCHED 승인/취소 금액 집계, 2.5% 수수료, 일자별 정산 저장 |
+| 인증/권한 | 완료 | 로그인, HMAC-SHA256 JWT, OPERATOR/ADMIN 역할 |
+| 감사 | 완료 | 로그인, 업로드, 대사, 정산 감사 로그 저장 및 ADMIN 조회 |
+| 테스트 | 완료 | MockMvc 통합 테스트로 핵심 흐름 검증 |
 
-## 핵심 업무 규칙
+## 거래 검증 규칙
 
-### 거래
+- `transactionId`는 전체 거래에서 유일해야 한다.
+- 거래 유형은 `APPROVAL`, `CANCEL`만 허용한다.
+- 금액은 `BigDecimal`과 DB `decimal(19,2)`로 처리하며 0보다 커야 한다.
+- 취소 거래는 `originalTransactionId`가 필요하다.
+- 취소 금액은 원 승인 금액을 초과할 수 없다.
+- 결제 번호는 마스킹된 값만 저장한다.
+- 정상 행은 `external_transactions`, 오류 행은 `validation_errors`에 저장한다.
 
-- `transactionId`는 외부 거래를 유일하게 식별하며 중복 저장하지 않는다.
-- 거래 유형은 `APPROVAL`, `CANCEL`만 지원한다.
-- 승인 금액은 0보다 커야 한다.
-- 취소는 `originalTransactionId`가 필요하며 원승인의 취소 가능 잔액을 초과할 수 없다.
-- 결제 식별값은 입력과 응답 모두 마스킹된 값만 취급한다.
+## 원장 검증 규칙
 
-### 업로드
+- `ledgerReferenceId`는 유일해야 한다.
+- `transactionId`는 원장 내에서 유일해야 한다.
+- `recordDate`는 `yyyy-MM-dd` 형식이어야 한다.
+- 금액은 0보다 커야 한다.
+- 상태는 `APPROVED`, `CANCELED`만 허용한다.
 
-- 거래와 원장 입력은 CSV만 허용한다.
-- 파일 SHA-256 해시를 `uploaded_files.content_hash`에 저장하여 동일 파일 재처리를 막는다.
-- 파일 전체를 폐기하지 않고 정상 행은 저장하며 오류 행은 `validation_errors`에 남긴다. 운영자가 오류 데이터만 수정하여 재처리할 수 있고 정상 거래의 처리 지연을 줄이기 위해서다.
+## 대사 규칙
 
-### 대사
+- `transactionId`를 기준으로 외부 거래와 내부 원장을 비교한다.
+- 결과 유형은 `MATCHED`, `LEDGER_MISSING`, `TRANSACTION_MISSING`, `AMOUNT_MISMATCH`, `STATUS_MISMATCH`다.
+- 같은 `businessDate`로 다시 실행하면 기존 결과를 삭제하고 새 결과를 저장한다.
+- 실행 이력은 `batch_executions`에 저장한다.
 
-- `transactionId` 기준으로 외부 거래와 원장을 조인한다.
-- 결과 분류는 `MATCHED`, `LEDGER_MISSING`, `TRANSACTION_MISSING`, `AMOUNT_MISMATCH`, `STATUS_MISMATCH`이다.
-- 동일 영업일에 다시 실행할 때 기존 결과를 교체하는 정책을 Phase 2 구현 시 트랜잭션과 함께 확정한다.
+## 정산 규칙
 
-### 정산
+- `MATCHED` 승인 금액 합계에서 `MATCHED` 취소 금액 합계를 차감한다.
+- 기본 수수료율은 2.5%다.
+- `settlements.business_date`는 유일하며 재실행 시 기존 정산을 교체한다.
+- 정산 실행 이력과 감사 로그를 남긴다.
 
-- `MATCHED` 승인 합계에서 `MATCHED` 취소 합계를 차감한다.
-- 수수료율 기본값은 2.5%이다.
-- 금액은 `BigDecimal`과 DB `decimal(19,2)`를 사용하여 부동소수점 오차를 허용하지 않는다.
-- `settlements.business_date` 고유 제약으로 일자별 확정 결과 중복을 방지한다.
+## 보안과 감사
 
-### 보안과 감사
-
-- Phase 4에서 `OPERATOR`와 `ADMIN` 역할을 적용한다.
-- 업로드, 대사, 정산, 재처리는 감사 로그 대상이다.
-- 민감 결제 번호 원문은 저장하지 않는다.
+- 업무 API는 Bearer JWT가 필요하다.
+- `OPERATOR`는 업로드, 조회, 대사, 정산을 실행할 수 있다.
+- `ADMIN`은 모든 업무 API에 더해 감사 로그를 조회할 수 있다.
+- 초기 개발 계정 비밀번호는 PBKDF2로 저장한다.
+- 운영 환경에서는 초기 계정과 `FINRECON_JWT_SECRET`을 교체해야 한다.

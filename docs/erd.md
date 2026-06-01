@@ -1,33 +1,112 @@
 # ERD
 
-## 초기 모델
-
 ```mermaid
 erDiagram
-    UPLOADED_FILES ||--o{ EXTERNAL_TRANSACTIONS : contains
-    UPLOADED_FILES ||--o{ VALIDATION_ERRORS : records
-    EXTERNAL_TRANSACTIONS o|--o{ RECONCILIATION_RESULTS : compared_in
-    LEDGER_ENTRIES o|--o{ RECONCILIATION_RESULTS : compared_in
-    SETTLEMENTS ||--o{ BATCH_EXECUTIONS : produced_by
-    APP_USERS ||--o{ AUDIT_LOGS : acts
+    uploaded_files ||--o{ external_transactions : contains
+    uploaded_files ||--o{ validation_errors : has
+    external_transactions ||--o{ reconciliation_results : compared
+    ledger_entries ||--o{ reconciliation_results : compared
+
+    uploaded_files {
+        bigint id PK
+        varchar file_type
+        varchar original_filename
+        varchar content_hash UK
+        varchar processing_status
+        int total_count
+        int valid_count
+        int error_count
+        int duplicate_count
+        timestamp uploaded_at
+    }
+
+    external_transactions {
+        bigint id PK
+        varchar transaction_id UK
+        bigint uploaded_file_id FK
+        varchar transaction_type
+        varchar original_transaction_id
+        varchar merchant_id
+        date transaction_date
+        decimal amount
+        varchar masked_payment_number
+        varchar partner_status
+        varchar processing_status
+        timestamp created_at
+    }
+
+    validation_errors {
+        bigint id PK
+        bigint uploaded_file_id FK
+        int row_number
+        varchar transaction_id
+        varchar field_name
+        varchar error_code
+        varchar error_message
+        timestamp created_at
+    }
+
+    ledger_entries {
+        bigint id PK
+        varchar ledger_reference_id UK
+        varchar transaction_id UK
+        varchar merchant_id
+        date record_date
+        decimal amount
+        varchar ledger_status
+        timestamp created_at
+    }
+
+    reconciliation_results {
+        bigint id PK
+        date business_date
+        varchar transaction_id
+        bigint external_transaction_id FK
+        bigint ledger_entry_id FK
+        varchar result_type
+        decimal compared_amount
+        timestamp executed_at
+    }
+
+    settlements {
+        bigint id PK
+        date business_date UK
+        decimal approval_amount
+        decimal cancellation_amount
+        decimal gross_amount
+        decimal fee_amount
+        decimal payout_amount
+        varchar settlement_status
+        timestamp confirmed_at
+    }
+
+    batch_executions {
+        bigint id PK
+        varchar job_name
+        date business_date
+        varchar execution_status
+        int processed_count
+        varchar error_message
+        timestamp started_at
+        timestamp completed_at
+    }
+
+    app_users {
+        bigint id PK
+        varchar username UK
+        varchar password_hash
+        varchar user_role
+        boolean active
+        timestamp created_at
+    }
+
+    audit_logs {
+        bigint id PK
+        varchar actor
+        varchar action_type
+        varchar target_type
+        varchar target_id
+        varchar metadata
+        timestamp occurred_at
+    }
 ```
-
-## 테이블 책임
-
-| 테이블 | 책임 | 주요 제약 |
-| --- | --- | --- |
-| `uploaded_files` | 입력 파일 처리 이력과 통계 | `content_hash` unique |
-| `external_transactions` | 외부 승인/취소 거래 | `transaction_id` unique |
-| `validation_errors` | 행 단위 검증 실패 | 파일 FK |
-| `ledger_entries` | 내부 기준 거래 원장 | 거래 ID, 원장 참조 ID unique |
-| `reconciliation_results` | 거래-원장 비교 결과 | 영업일 인덱스 |
-| `settlements` | 확정된 일별 지급 결과 | `business_date` unique |
-| `batch_executions` | 정산 등 작업 실행 이력 | 상태/실패 원인 |
-| `app_users` | 후속 인증 사용자 | `username` unique |
-| `audit_logs` | 주요 조작 이력 | 행위자/대상/시각 |
-
-## 설계 경계
-
-- Phase 0에서는 Flyway로 테이블 기준선만 생성한다. JPA 엔티티는 해당 도메인을 구현하는 Phase에서 DTO와 함께 추가한다.
-- 외부 거래와 원장 누락 양쪽을 표현해야 하므로 대사 결과의 두 FK는 nullable이다.
-- 스키마의 시간 컬럼은 초기 기준선이며 Phase 4 운영 정책에서 UTC/감사 보존 정책을 결정한다.
