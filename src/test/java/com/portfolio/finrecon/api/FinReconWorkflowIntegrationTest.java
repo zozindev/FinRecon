@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
+import com.jayway.jsonpath.JsonPath;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,12 +38,15 @@ class FinReconWorkflowIntegrationTest {
 
     @Test
     void uploadsReconcilesAndSettlesDailyTransactions() throws Exception {
+        String token = login("operator", "operator123!");
+
         mockMvc.perform(multipart("/api/v1/transaction-files")
                 .file(csv("file", "transactions.csv", """
                         transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
                         TXN-20260601-0001,APPROVAL,,MERCHANT-001,2026-06-01,12000.00,****-****-****-1234,APPROVED
                         TXN-20260601-0002,CANCEL,TXN-20260601-0001,MERCHANT-001,2026-06-01,2000.00,****-****-****-1234,CANCELED
-                        """)))
+                        """))
+                .header("Authorization", bearer(token)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.validCount").value(2))
                 .andExpect(jsonPath("$.data.errorCount").value(0));
@@ -52,12 +56,14 @@ class FinReconWorkflowIntegrationTest {
                         ledgerReferenceId,transactionId,merchantId,recordDate,amount,status
                         LEDGER-0001,TXN-20260601-0001,MERCHANT-001,2026-06-01,12000.00,APPROVED
                         LEDGER-0002,TXN-20260601-0002,MERCHANT-001,2026-06-01,2000.00,CANCELED
-                        """)))
+                        """))
+                .header("Authorization", bearer(token)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.validCount").value(2))
                 .andExpect(jsonPath("$.data.errorCount").value(0));
 
         mockMvc.perform(post("/api/v1/reconciliations")
+                .header("Authorization", bearer(token))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"businessDate\":\"2026-06-01\"}"))
                 .andExpect(status().isOk())
@@ -66,12 +72,14 @@ class FinReconWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data[1].resultType").value("MATCHED"));
 
         mockMvc.perform(get("/api/v1/reconciliations/summary")
+                .header("Authorization", bearer(token))
                 .param("businessDate", "2026-06-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalCount").value(2))
                 .andExpect(jsonPath("$.data.counts.MATCHED").value(2));
 
         mockMvc.perform(post("/api/v1/settlements/daily")
+                .header("Authorization", bearer(token))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"businessDate\":\"2026-06-01\"}"))
                 .andExpect(status().isOk())
@@ -84,19 +92,40 @@ class FinReconWorkflowIntegrationTest {
 
     @Test
     void storesInvalidTransactionRowsAsValidationErrors() throws Exception {
+        String token = login("operator", "operator123!");
+
         mockMvc.perform(multipart("/api/v1/transaction-files")
                 .file(csv("file", "invalid-transactions.csv", """
                         transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
                         TXN-INVALID-0001,APPROVAL,,MERCHANT-001,2026-06-01,-100.00,****-****-****-1234,APPROVED
-                        """)))
+                        """))
+                .header("Authorization", bearer(token)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.validCount").value(0))
                 .andExpect(jsonPath("$.data.errorCount").value(1));
 
-        mockMvc.perform(get("/api/v1/validation-errors"))
+        mockMvc.perform(get("/api/v1/validation-errors")
+                .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].errorCode").value("INVALID_AMOUNT"));
+    }
+
+    @Test
+    void protectsBusinessApisAndRequiresAdminForAuditLogs() throws Exception {
+        String operatorToken = login("operator", "operator123!");
+        String adminToken = login("admin", "admin123!");
+
+        mockMvc.perform(get("/api/v1/transactions"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", bearer(operatorToken)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk());
     }
 
     private MockMultipartFile csv(String name, String filename, String content) {
@@ -105,5 +134,21 @@ class FinReconWorkflowIntegrationTest {
                 filename,
                 "text/csv",
                 content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String login(String username, String password) throws Exception {
+        String body = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
+        String response = mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return JsonPath.read(response, "$.data.accessToken");
+    }
+
+    private String bearer(String token) {
+        return "Bearer " + token;
     }
 }

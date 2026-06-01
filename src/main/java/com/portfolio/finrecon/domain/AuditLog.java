@@ -35,4 +35,32 @@ public class AuditLog {
         this.metadata = metadata;
         this.occurredAt = occurredAt;
     }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getActor() {
+        return actor;
+    }
+
+    public String getActionType() {
+        return actionType;
+    }
+
+    public String getTargetType() {
+        return targetType;
+    }
+
+    public String getTargetId() {
+        return targetId;
+    }
+
+    public String getMetadata() {
+        return metadata;
+    }
+
+    public LocalDateTime getOccurredAt() {
+        return occurredAt;
+    }
 }

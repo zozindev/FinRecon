@@ -9,3 +9,8 @@ spring:
       ddl-auto: none
   flyway:
     enabled: true
+
+finrecon:
+  auth:
+    jwt-secret: test-secret
+    expires-in-seconds: 3600

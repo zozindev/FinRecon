@@ -18,11 +18,11 @@ class PlatformStatusControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    void returnsPhaseZeroReadiness() throws Exception {
+    void returnsCoreWorkflowReadiness() throws Exception {
         mockMvc.perform(get("/api/v1/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.application").value("FinRecon"))
-                .andExpect(jsonPath("$.data.phase").value("PHASE_0"))
+                .andExpect(jsonPath("$.data.phase").value("CORE_WORKFLOW"))
                 .andExpect(jsonPath("$.data.status").value("READY"));
     }
 }

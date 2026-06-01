@@ -12,7 +12,7 @@ public class PlatformStatusController {
 
     @GetMapping
     public ApiResponse<PlatformStatusResponse> getStatus() {
-        return ApiResponse.of(new PlatformStatusResponse("FinRecon", "PHASE_0", "READY"));
+        return ApiResponse.of(new PlatformStatusResponse("FinRecon", "CORE_WORKFLOW", "READY"));
     }
 
     public record PlatformStatusResponse(String application, String phase, String status) {
