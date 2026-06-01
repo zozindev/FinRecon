@@ -165,6 +165,10 @@ Request:
 
 대사/정산 실행 이력을 조회합니다.
 
+### `POST /batch-executions/{executionId}/retry`
+
+기존 배치 실행 이력의 작업명과 업무 일자를 기준으로 같은 작업을 다시 실행합니다.
+
 ### `GET /audit-logs`
 
 감사 로그를 조회합니다. `ADMIN` 권한이 필요합니다.

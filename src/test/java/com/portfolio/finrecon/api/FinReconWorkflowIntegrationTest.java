@@ -1,6 +1,7 @@
 package com.portfolio.finrecon.api;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,8 +94,50 @@ class FinReconWorkflowIntegrationTest {
                 .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].id", notNullValue()))
                 .andExpect(jsonPath("$.data[0].executionStatus").value("SUCCESS"))
                 .andExpect(jsonPath("$.data[1].executionStatus").value("SUCCESS"));
+    }
+
+    @Test
+    void retriesExistingBatchExecution() throws Exception {
+        String token = login("operator", "operator123!");
+
+        mockMvc.perform(multipart("/api/v1/transaction-files")
+                .file(csv("file", "retry-transactions.csv", """
+                        transactionId,transactionType,originalTransactionId,merchantId,transactionDate,amount,maskedPaymentNumber,status
+                        TXN-RETRY-0001,APPROVAL,,MERCHANT-001,2026-06-02,1000.00,****-****-****-1234,APPROVED
+                        """))
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(multipart("/api/v1/ledger-files")
+                .file(csv("file", "retry-ledger.csv", """
+                        ledgerReferenceId,transactionId,merchantId,recordDate,amount,status
+                        LEDGER-RETRY-0001,TXN-RETRY-0001,MERCHANT-001,2026-06-02,1000.00,APPROVED
+                        """))
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/reconciliations")
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"businessDate\":\"2026-06-02\"}"))
+                .andExpect(status().isOk());
+
+        String response = mockMvc.perform(get("/api/v1/batch-executions")
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Number executionId = JsonPath.read(response, "$.data[0].id");
+
+        mockMvc.perform(post("/api/v1/batch-executions/{executionId}/retry", executionId)
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.jobName").value("DAILY_RECONCILIATION"))
+                .andExpect(jsonPath("$.data.executionStatus").value("SUCCESS"));
     }
 
     @Test

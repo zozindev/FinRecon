@@ -158,6 +158,19 @@ paths:
       responses:
         "200":
           description: Batch execution list
+  /api/v1/batch-executions/{executionId}/retry:
+    post:
+      summary: Retry a previous domain batch execution
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Retried batch execution result
   /api/v1/audit-logs:
     get:
       summary: List audit logs
