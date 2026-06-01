@@ -63,6 +63,7 @@ public class TransactionFileService {
 
     @Transactional
     public UploadedFile upload(MultipartFile file) {
+        validateCsvFile(file);
         byte[] content = bytes(file);
         String hash = fileHashService.sha256(content);
         if (uploadedFileRepository.existsByContentHash(hash)) {
@@ -183,6 +184,16 @@ public class TransactionFileService {
             return file.getBytes();
         } catch (IOException exception) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE", "Uploaded file cannot be read.");
+        }
+    }
+
+    private void validateCsvFile(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "EMPTY_FILE", "Uploaded CSV file is empty.");
+        }
+        String filename = originalFilename(file).toLowerCase();
+        if (!filename.endsWith(".csv")) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE_TYPE", "Only CSV files are allowed.");
         }
     }
 

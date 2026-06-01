@@ -25,7 +25,10 @@ public class CsvFileReader {
             if (headerLine == null) {
                 throw invalidFile("CSV file is empty.");
             }
-            List<String> header = List.of(headerLine.split(",", -1));
+            List<String> header = new ArrayList<>(List.of(headerLine.split(",", -1)));
+            if (!header.isEmpty()) {
+                header.set(0, removeUtf8Bom(header.get(0)));
+            }
             if (!header.equals(expectedHeader)) {
                 throw invalidFile("CSV header does not match the expected format.");
             }
@@ -57,6 +60,13 @@ public class CsvFileReader {
 
     private DomainException invalidFile(String message) {
         return new DomainException(HttpStatus.BAD_REQUEST, "INVALID_CSV_FILE", message);
+    }
+
+    private String removeUtf8Bom(String value) {
+        if (!value.isEmpty() && value.charAt(0) == '\uFEFF') {
+            return value.substring(1);
+        }
+        return value;
     }
 
     public record CsvRow(int rowNumber, Map<String, String> fields) {

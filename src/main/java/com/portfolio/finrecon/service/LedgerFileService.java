@@ -58,6 +58,7 @@ public class LedgerFileService {
 
     @Transactional
     public UploadedFile upload(MultipartFile file) {
+        validateCsvFile(file);
         byte[] content = bytes(file);
         String hash = fileHashService.sha256(content);
         if (uploadedFileRepository.existsByContentHash(hash)) {
@@ -66,7 +67,7 @@ public class LedgerFileService {
 
         UploadedFile uploadedFile = uploadedFileRepository.save(new UploadedFile(
                 FileType.LEDGER,
-                file.getOriginalFilename() == null ? "ledger-entries.csv" : file.getOriginalFilename(),
+                originalFilename(file),
                 hash,
                 LocalDateTime.now()));
 
@@ -154,6 +155,19 @@ public class LedgerFileService {
         } catch (IOException exception) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE", "Uploaded file cannot be read.");
         }
+    }
+
+    private void validateCsvFile(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "EMPTY_FILE", "Uploaded CSV file is empty.");
+        }
+        if (!originalFilename(file).toLowerCase().endsWith(".csv")) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE_TYPE", "Only CSV files are allowed.");
+        }
+    }
+
+    private String originalFilename(MultipartFile file) {
+        return file.getOriginalFilename() == null ? "ledger-entries.csv" : file.getOriginalFilename();
     }
 
     private BigDecimal parseAmount(String value) {

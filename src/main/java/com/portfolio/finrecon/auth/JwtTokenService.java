@@ -37,21 +37,23 @@ public class JwtTokenService {
     }
 
     public AuthenticatedUser parse(String token) {
-        String[] parts = token.split("\\.");
-        if (parts.length != 3 || !constantTimeEquals(sign(parts[0] + "." + parts[1]), parts[2])) {
-            throw unauthorized("Invalid access token.");
-        }
-        String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-        String username = extractString(payload, "sub");
-        String role = extractString(payload, "role");
-        long expiresAt = extractLong(payload, "exp");
-        if (username == null || role == null || Instant.now().getEpochSecond() >= expiresAt) {
-            throw unauthorized("Access token is expired or invalid.");
-        }
         try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3 || !constantTimeEquals(sign(parts[0] + "." + parts[1]), parts[2])) {
+                throw unauthorized("Invalid access token.");
+            }
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            String username = extractString(payload, "sub");
+            String role = extractString(payload, "role");
+            long expiresAt = extractLong(payload, "exp");
+            if (username == null || role == null || Instant.now().getEpochSecond() >= expiresAt) {
+                throw unauthorized("Access token is expired or invalid.");
+            }
             return new AuthenticatedUser(username, UserRole.valueOf(role));
-        } catch (IllegalArgumentException exception) {
-            throw unauthorized("Access token role is invalid.");
+        } catch (DomainException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw unauthorized("Access token is malformed.");
         }
     }
 

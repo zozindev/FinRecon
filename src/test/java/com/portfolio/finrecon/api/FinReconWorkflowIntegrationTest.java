@@ -112,12 +112,32 @@ class FinReconWorkflowIntegrationTest {
     }
 
     @Test
+    void rejectsNonCsvUploads() throws Exception {
+        String token = login("operator", "operator123!");
+
+        mockMvc.perform(multipart("/api/v1/transaction-files")
+                .file(new MockMultipartFile(
+                        "file",
+                        "transactions.txt",
+                        "text/plain",
+                        "not,csv".getBytes(StandardCharsets.UTF_8)))
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_FILE_TYPE"));
+    }
+
+    @Test
     void protectsBusinessApisAndRequiresAdminForAuditLogs() throws Exception {
         String operatorToken = login("operator", "operator123!");
         String adminToken = login("admin", "admin123!");
 
         mockMvc.perform(get("/api/v1/transactions"))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/transactions")
+                .header("Authorization", "Bearer malformed-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(get("/api/v1/audit-logs")
                 .header("Authorization", bearer(operatorToken)))
