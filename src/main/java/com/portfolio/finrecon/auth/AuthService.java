@@ -31,7 +31,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         AppUser user = appUserRepository.findByUsernameAndActiveTrue(request.username())
                 .orElseThrow(() -> invalidLogin());
-        if (!user.getPasswordHash().equals(passwordHashService.sha256(request.password()))) {
+        if (!passwordHashService.matches(request.password(), user.getPasswordHash())) {
             throw invalidLogin();
         }
         String token = jwtTokenService.create(user.getUsername(), user.getUserRole());
